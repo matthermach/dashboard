@@ -33,7 +33,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir _site
-          cp index.html styles.css app.mjs core.mjs data.json "Lead Times - 2024-25.xlsx" _site/
+          cp index.html styles.css app.mjs core.mjs data.json throughput.json "Lead Times - 2024-25.xlsx" "Throughput Daily.xlsx" _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
