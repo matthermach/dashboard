@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { percentile, analyze, validatePoints, validateBackup, validDate } from '../core.mjs';
+import { percentile, analyze, validatePoints, validateBackup, validateDateRange, validDate } from '../core.mjs';
 
 const points = JSON.parse(readFileSync(new URL('../data.json', import.meta.url)));
 
@@ -64,4 +64,49 @@ test('backups round-trip additions and exclusions; invalid files are rejected', 
   assert.equal(validDate('2024-02-29'), true);
   assert.equal(validDate('2025-02-29'), false);
   assert.equal(validDate('1899-12-31'), false);
+});
+
+test('date filters include both boundaries and support open or single-day ranges', () => {
+  const sample = [
+    { id: 'before', size: 'S', date: '2024-12-31', days: 100 },
+    { id: 'start', size: 'S', date: '2025-01-01', days: 10 },
+    { id: 'end', size: 'M', date: '2025-01-31', days: 30 },
+    { id: 'after', size: 'L', date: '2025-02-01', days: 200 },
+  ];
+  const all = new Set(['S', 'M', 'L']);
+  const excluded = new Set();
+  const range = { from: '2025-01-01', to: '2025-01-31' };
+  const result = analyze(sample, all, excluded, range);
+  assert.deepEqual(result.visible.map((point) => point.id), ['start', 'end']);
+  assert.equal(result.p50, 20);
+  assert.equal(result.p85, 27);
+  assert.equal(result.p95, 29);
+  assert.equal(analyze(sample, all, excluded, { from: range.from }).visible.length, 3);
+  assert.equal(analyze(sample, all, excluded, { to: range.to }).visible.length, 3);
+  assert.deepEqual(analyze(sample, all, excluded, { from: range.to, to: range.to }).visible.map((point) => point.id), ['end']);
+  assert.deepEqual(analyze(sample, all, excluded, { from: '', to: '' }), analyze(sample, all, excluded));
+  assert.equal(analyze(sample, new Set(['S']), excluded, range).p95, 10);
+  const withExclusion = analyze(sample, all, new Set(['end']), range);
+  assert.equal(withExclusion.visible.length, 2);
+  assert.equal(withExclusion.active.length, 1);
+  assert.equal(withExclusion.p85, 10);
+  const empty = analyze(sample, all, excluded, { from: '2026-01-01' });
+  assert.equal(empty.visible.length, 0);
+  assert.equal(empty.p50, null);
+  assert.equal(empty.p85, null);
+  assert.equal(empty.p95, null);
+});
+
+test('invalid or reversed date ranges are rejected before filtering', () => {
+  for (const range of [
+    { from: '2025-02-01', to: '2025-01-01' },
+    { from: '2025-02-29' },
+    { to: 'not-a-date' },
+    { from: '1899-12-31' },
+    { to: '10000-01-01' },
+  ]) {
+    assert.throws(() => validateDateRange(range));
+    assert.throws(() => analyze(points, new Set(['S']), new Set(), range));
+  }
+  assert.doesNotThrow(() => validateDateRange({ from: '2024-02-29', to: '2024-02-29' }));
 });

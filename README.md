@@ -7,7 +7,16 @@ Scatterplot rozróżnia kolorem S, M i L. Filtry można łączyć. Kliknięcie p
 lub przycisku w tabeli wyklucza go z prognozy; ponowne kliknięcie przywraca.
 Nie ma automatycznego usuwania outlierów.
 
-P50, P85 i P95 są liczone dla aktywnych rozmiarów i niewykluczonych punktów,
+Filtr **Data ukończenia** pozwala podać datę „Od”, „Do” lub obie i wybrać
+**Zastosuj**. Granice są włączone do zakresu, a puste pole oznacza brak granicy.
+Filtr działa razem z rozmiarami i wykluczeniami na wykres, prognozy oraz tabelę.
+Odwrócony zakres jest odrzucany z komunikatem bez zmiany poprzedniej analizy.
+**Wyczyść daty** usuwa tylko zakres dat; nie zmienia rozmiarów ani wykluczeń.
+Zakres dat nie jest zapisywany po odświeżeniu ani w kopii JSON.
+Eksport zawsze zawiera wszystkie punkty, również poza filtrami. Nowy punkt
+spoza wybranego okresu jest zapisywany, ale nie jest widoczny do zmiany filtra.
+
+P50, P85 i P95 są liczone dla aktywnych rozmiarów, dat i niewykluczonych punktów,
 metodą interpolacji liniowej zgodną z Excel `PERCENTILE.INC`.
 To percentyle historycznej próby, nie gwarancje terminu. Jednostka: dni.
 

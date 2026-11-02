@@ -43,8 +43,18 @@ export function percentile(values, probability) {
   return sorted[lower] * (1 - fraction) + sorted[Math.ceil(index)] * fraction;
 }
 
-export function analyze(points, sizes, excluded) {
-  const visible = points.filter((point) => sizes.has(point.size));
+export function validateDateRange({ from = '', to = '' } = {}) {
+  if ((from !== '' && !validDate(from)) || (to !== '' && !validDate(to))) {
+    throw new Error('Podaj poprawne daty ukończenia od 1900-01-01 do 9999-12-31.');
+  }
+  if (from && to && from > to) throw new Error('Data „od” nie może być późniejsza niż data „do”.');
+}
+
+export function analyze(points, sizes, excluded, dateRange = {}) {
+  validateDateRange(dateRange);
+  const { from, to } = dateRange;
+  const visible = points.filter((point) => sizes.has(point.size)
+    && (!from || point.date >= from) && (!to || point.date <= to));
   const active = visible.filter((point) => !excluded.has(point.id));
   const values = active.map((point) => point.days);
   return { visible, active, p50: percentile(values, .5), p85: percentile(values, .85), p95: percentile(values, .95) };
