@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101116">
-  <meta name="description" content="Dashboard czasów realizacji: scatterplot, percentyle i prognozy dla elementów S, M i L.">
-  <title>FlowLens — czasy realizacji</title>
+  <meta name="description" content="Dashboard przepływu: czasy realizacji, percentyle oraz tygodniowy wykres XMR tempa dostarczania.">
+  <title>FlowLens — analityka przepływu</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23bcf578'/%3E%3Cpath d='M12 27V13h17M12 20h12' fill='none' stroke='%23101116' stroke-width='4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.mjs"></script>
@@ -17,6 +17,7 @@
     <p class="nav-label">PRZEGLĄD</p>
     <nav aria-label="Nawigacja">
       <a class="nav-link active" href="#overview"><span aria-hidden="true">▦</span> Czasy realizacji <span class="nav-indicator"></span></a>
+      <a class="nav-link" href="#throughput"><span aria-hidden="true">↗</span> Tempo dostarczania</a>
       <a class="nav-link" href="#data-section"><span aria-hidden="true">▤</span> Dane źródłowe</a>
       <a class="nav-link" href="#method"><span aria-hidden="true">ⓘ</span> Jak to działa</a>
     </nav>
@@ -27,11 +28,16 @@
     </div>
   </aside>
   <div class="main-shell">
-    <header class="topbar"><div><span class="breadcrumb-muted">Analityka</span><span class="slash">/</span>Czasy realizacji</div><span class="live-badge"><span class="status-dot"></span> Dane z XLSX</span></header>
+    <header class="topbar"><div><span class="breadcrumb-muted">Analityka</span><span class="slash">/</span><span id="current-view">Czasy realizacji</span></div><span class="live-badge"><span class="status-dot"></span> Dane z XLSX</span></header>
     <main id="overview">
+      <div class="dashboard-tabs" role="tablist" aria-label="Analiza przepływu">
+        <button id="lead-time-tab" class="dashboard-tab" role="tab" aria-selected="true" aria-controls="lead-time-panel" tabindex="0">Czasy realizacji</button>
+        <button id="throughput-tab" class="dashboard-tab" role="tab" aria-selected="false" aria-controls="throughput-panel" tabindex="-1">Tempo dostarczania · XMR</button>
+      </div>
+      <div id="status" class="sr-only" role="status" aria-live="polite"></div>
+      <div id="lead-time-panel" role="tabpanel" aria-labelledby="lead-time-tab">
       <div class="page-heading"><div><p class="eyebrow">MNIEJ ZGADYWANIA. WIĘCEJ PEWNOŚCI.</p><h1>Czasy realizacji<span class="heading-dot">.</span></h1><p class="subtitle">Zobacz przepływ pracy. Planuj na podstawie danych.</p></div><div class="heading-actions"><button class="button secondary" id="export-button"><span aria-hidden="true">↓</span> Eksportuj dane</button><a class="button primary" href="#add-section"><span aria-hidden="true">＋</span> Dodaj element</a></div></div>
       <div id="error" class="notice error" role="alert" hidden></div>
-      <div id="status" class="sr-only" role="status" aria-live="polite"></div>
       <section class="filter-bar" aria-label="Filtry danych">
         <div class="size-filters"><span class="filter-label">Rozmiar</span><button class="filter active" data-size="all" aria-pressed="true">Wszystkie <span id="count-all">—</span></button><button class="filter" data-size="S" aria-pressed="true"><i class="dot size-S"></i>S <span id="count-S">—</span></button><button class="filter" data-size="M" aria-pressed="true"><i class="dot size-M"></i>M <span id="count-M">—</span></button><button class="filter" data-size="L" aria-pressed="true"><i class="dot size-L"></i>L <span id="count-L">—</span></button></div>
         <div class="range-label"><span aria-hidden="true">▦</span><span id="date-range">Wczytywanie danych…</span></div>
@@ -77,6 +83,36 @@
       </section>
       <details class="method" id="method"><summary>Jak czytać prognozy i zarządzać danymi?</summary><div><p>Percentyle P50, P85 i P95 liczymy metodą interpolacji liniowej (jak PERCENTILE.INC w Excelu) dla aktywnych rozmiarów i wybranego zakresu dat ukończenia, bez wykluczonych punktów. Przykład: P85 = 150 dni oznacza, że około 85% historycznej próby mieści się w tym czasie. To wskazówka oparta na historii, nie gwarancja przyszłego terminu. Mała próba obniża wiarygodność prognozy.</p><p>Kliknięcie kropki lub przycisku w tabeli wyklucza element z obliczeń; ponowne kliknięcie go przywraca. Wykluczone kropki mają przerywaną obwódkę. Nie usuwamy odstających obserwacji automatycznie. Filtry rozmiaru można łączyć z datami ukończenia. Wpisz datę „od”, „do” lub obie i wybierz „Zastosuj”. Granice są włączone do zakresu; puste pole nie ogranicza dat. „Wyczyść daty” usuwa tylko filtr dat, nie zmienia rozmiarów ani wykluczeń. Filtry nie usuwają danych i nie ograniczają eksportu. Po odświeżeniu strony zakres dat jest pusty.</p><p>Dane bazowe pochodzą z pliku <a href="./Lead%20Times%20-%202024-25.xlsx" download>Lead Times - 2024-25.xlsx</a>. Jednostkę czasu przyjęto jako dni. Nowe punkty i wykluczenia są przechowywane wyłącznie w tej przeglądarce; nie są współdzielone i nie modyfikują arkusza. Eksport JSON zawiera pełną kopię punktów i wykluczeń. Import zastępuje lokalną kopię po potwierdzeniu. Wyczyszczenie danych przeglądarki usuwa lokalne zmiany.</p></div></details>
       <footer class="page-footer"><span class="footer-brand">FlowLens<span>.</span></span><span>Przejrzysty przepływ. Świadome decyzje.</span><span id="source-note">Źródło: Lead Times · 2024–25</span></footer>
+      </div>
+      <section id="throughput-panel" role="tabpanel" aria-labelledby="throughput-tab" hidden>
+        <div class="page-heading"><div><p class="eyebrow">TEMPO PRACY. ZMIENNOŚĆ. PRZEWIDYWALNOŚĆ.</p><h1>Tempo dostarczania<span class="heading-dot">.</span></h1><p class="subtitle">Wykres XMR · tygodniowe sumy ukończonych elementów od 7 stycznia.</p></div></div>
+        <div id="throughput-error" class="notice error" role="alert" hidden></div>
+        <p id="throughput-loading" class="subtitle" role="status">Wczytywanie danych przepustowości…</p>
+        <div id="throughput-content" hidden>
+          <section class="stats-grid" aria-label="Podsumowanie tempa dostarczania">
+            <article class="stat-card"><div class="stat-top">Okresy tygodniowe</div><div class="stat-value" id="throughput-weeks">—</div><div class="stat-foot" id="throughput-range">—</div></article>
+            <article class="stat-card"><div class="stat-top">Dostarczone elementy</div><div class="stat-value" id="throughput-total">—</div><div class="stat-foot">Suma od 7 stycznia</div></article>
+            <article class="stat-card featured"><div class="stat-top">Średnie tempo · X̄</div><div class="stat-value"><span id="throughput-mean">—</span><span class="unit">elem./tydz.</span></div><div class="stat-foot">Średnia tygodniowych sum</div></article>
+            <article class="stat-card"><div class="stat-top">Średni moving range · MR̄</div><div class="stat-value" id="throughput-mr">—</div><div class="stat-foot">Średnia bezwzględnych zmian tydzień do tygodnia</div></article>
+          </section>
+          <p id="throughput-warning" class="notice" hidden></p>
+          <section class="panel xmr-panel" aria-labelledby="x-title">
+            <div class="panel-heading"><div><h2 id="x-title">X · tempo dostarczania</h2><p>Suma elementów w tygodniu. Korytarz: X̄ − 2,66 × MR̄ do X̄ + 2,66 × MR̄.</p></div></div>
+            <div class="chart-wrap"><div class="axis-title">Ukończone elementy / tydzień</div><svg id="throughput-x-chart" class="xmr-chart" role="img" aria-label="Wykres X tygodniowego tempa dostarczania" aria-describedby="throughput-method"></svg></div>
+            <p class="chart-footer" id="x-limits"></p>
+          </section>
+          <section class="panel xmr-panel" aria-labelledby="mr-title">
+            <div class="panel-heading"><div><h2 id="mr-title">MR · zmienność tempa</h2><p>MR = |X bieżącego tygodnia − X poprzedniego tygodnia|. Korytarz: MR̄ − 3,27 × MR̄ do MR̄ + 3,27 × MR̄.</p></div></div>
+            <div class="chart-wrap"><div class="axis-title">Bezwzględna zmiana liczby elementów</div><svg id="throughput-mr-chart" class="xmr-chart" role="img" aria-label="Wykres MR zmian tygodniowego tempa dostarczania" aria-describedby="throughput-method"></svg></div>
+            <p class="chart-footer" id="mr-limits"></p>
+          </section>
+          <section class="panel data-panel" aria-labelledby="throughput-data-title">
+            <div class="panel-heading"><div><h2 id="throughput-data-title">Dane tygodniowe</h2><p>Dokładne wartości X i MR oraz kompletność każdego okresu.</p></div></div>
+            <div class="table-scroll"><table><thead><tr><th scope="col">TYDZIEŃ OD–DO</th><th scope="col">X · ELEMENTY</th><th scope="col">MR</th><th scope="col">DNI W ARKUSZU</th></tr></thead><tbody id="throughput-body"></tbody></table></div>
+          </section>
+          <div class="method" id="throughput-method"><p>Tygodnie to kolejne okresy 7 dni od 7 stycznia roku pierwszej daty w arkuszu (7–13 stycznia, 14–20 stycznia itd.), także przez granicę roku. Sumujemy dzienne wartości, a nie liczbę wierszy. Pierwszy tydzień nie ma MR. Średnie i granice liczymy dla wszystkich pokazanych okresów, także niepełnych; nie ekstrapolujemy brakujących dni. Kropki w kolorze pomarańczowym przekraczają granice, a puste kropki oznaczają niepełny tydzień. Dolne granice pozostają zgodne z wzorami, nawet gdy są ujemne. Dla jednego tygodnia nie wyznaczamy MR ani korytarzy.</p><p>Źródło: <a href="./Throughput%20Daily.xlsx" download>Throughput Daily.xlsx</a>. Ta analiza jest niezależna od filtrów, lokalnych dodatków i wykluczeń w zakładce czasów realizacji.</p></div>
+        </div>
+      </section>
     </main>
   </div>
 </body>

@@ -1,4 +1,4 @@
-import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze } from './core.mjs';
+import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze, analyzeThroughput } from './core.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const colors = { S: '#bcf578', M: '#ab9bff', L: '#f6af73' };
@@ -8,6 +8,7 @@ const shortDate = new Intl.DateTimeFormat('pl-PL', { month: 'short', year: '2-di
 const dayMs = 86400000;
 const state = { points: [], excluded: new Set(), sizes: new Set(SIZES), dateRange: {}, ready: false, recovery: false };
 let analysis;
+let throughput;
 
 function announce(message) { $('#status').textContent = message; }
 function error(message) { $('#error').textContent = message; $('#error').hidden = false; }
@@ -60,7 +61,7 @@ function svgElement(tag, attributes = {}, text) {
 }
 
 function renderChart() {
-  if (!state.ready) return;
+  if (!state.ready || $('#lead-time-panel').hidden) return;
   const chart = $('#chart');
   $('#tooltip').hidden = true;
   chart.replaceChildren();
@@ -301,6 +302,154 @@ $('#import-file').addEventListener('change', async (event) => {
 });
 new ResizeObserver(() => renderChart()).observe($('#chart-wrap'));
 
+function selectView(isThroughput) {
+  for (const [id, selected] of [['lead-time', !isThroughput], ['throughput', isThroughput]]) {
+    $(`#${id}-tab`).setAttribute('aria-selected', selected);
+    $(`#${id}-tab`).tabIndex = selected ? 0 : -1;
+    $(`#${id}-panel`).hidden = !selected;
+  }
+  $('#current-view').textContent = isThroughput ? 'Tempo dostarczania' : 'Czasy realizacji';
+  for (const link of document.querySelectorAll('.nav-link')) {
+    link.classList.toggle('active', link.hash === (isThroughput ? '#throughput' : '#overview'));
+  }
+  if (isThroughput) renderThroughputCharts();
+  else renderChart();
+}
+
+for (const [index, tab] of [...document.querySelectorAll('[role="tab"]')].entries()) {
+  tab.addEventListener('click', () => {
+    history.replaceState(null, '', index === 1 ? '#throughput' : '#overview');
+    selectView(index === 1);
+  });
+  tab.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index;
+    const target = next === 1 ? $('#throughput-tab') : $('#lead-time-tab');
+    target.click();
+    target.focus();
+  });
+}
+window.addEventListener('hashchange', () => selectView(location.hash === '#throughput'));
+selectView(location.hash === '#throughput');
+
+function renderControlChart(selector, values, mean, limits, label) {
+  const chart = $(selector);
+  chart.replaceChildren();
+  const width = Math.max(260, chart.getBoundingClientRect().width);
+  const height = chart.getBoundingClientRect().height;
+  chart.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  const margin = { top: 20, right: 20, bottom: 45, left: 60 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const numbers = values.filter((value) => value !== null);
+  const low = Math.min(0, ...numbers, limits?.lower ?? 0);
+  const high = Math.max(1, ...numbers, limits?.upper ?? 0);
+  const padding = (high - low) * .08;
+  const minY = low - padding;
+  const maxY = high + padding;
+  const x = (index) => margin.left + (values.length === 1 ? .5 : index / (values.length - 1)) * plotWidth;
+  const y = (value) => margin.top + (maxY - value) / (maxY - minY) * plotHeight;
+  if (limits) {
+    chart.append(svgElement('rect', {
+      x: margin.left, y: y(limits.upper), width: plotWidth,
+      height: y(limits.lower) - y(limits.upper), class: 'xmr-band',
+    }));
+  }
+  for (let index = 0; index <= 5; index++) {
+    const value = low + (high - low) * index / 5;
+    chart.append(svgElement('line', { x1: margin.left, x2: width - margin.right, y1: y(value), y2: y(value), class: 'chart-grid' }));
+    chart.append(svgElement('text', { x: margin.left - 10, y: y(value) + 3, 'text-anchor': 'end', class: 'chart-axis' }, number.format(value)));
+  }
+  for (const [value, name, className] of [
+    [mean, 'Średnia', 'xmr-mean'],
+    [limits?.lower, 'Dolna granica', 'xmr-limit'],
+    [limits?.upper, 'Górna granica', 'xmr-limit'],
+  ]) {
+    if (value === null || value === undefined) continue;
+    const line = svgElement('line', { x1: margin.left, x2: width - margin.right, y1: y(value), y2: y(value), class: className });
+    line.append(svgElement('title', {}, `${name}: ${number.format(value)}`));
+    chart.append(line);
+  }
+  const tickStep = Math.max(1, Math.ceil(values.length / Math.max(2, Math.floor(plotWidth / 105))));
+  for (const [index, week] of throughput.weeks.entries()) {
+    if (index % tickStep !== 0 && index !== values.length - 1) continue;
+    // Keep the final date from colliding with the preceding tick on narrow screens.
+    if (index !== values.length - 1 && values.length - 1 - index < tickStep * .7) continue;
+    const text = svgElement('text', {
+      x: x(index), y: height - 15, 'text-anchor': 'middle', class: 'chart-axis',
+    }, new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(Date.parse(`${week.start}T00:00:00Z`)));
+    chart.append(text);
+  }
+  const path = values.map((value, index) => value === null ? '' : `${index === 0 || values[index - 1] === null ? 'M' : 'L'}${x(index)},${y(value)}`).join(' ');
+  chart.append(svgElement('path', { d: path, class: 'xmr-series' }));
+  for (const [index, value] of values.entries()) {
+    if (value === null) continue;
+    const week = throughput.weeks[index];
+    const outside = limits && (value < limits.lower || value > limits.upper);
+    const description = `${formatDate(week.start)} – ${formatDate(week.end)}: ${label} = ${number.format(value)}${outside ? ', poza korytarzem' : ''}. Dane: ${week.observedDays}/7 dni.`;
+    const point = svgElement('circle', {
+      cx: x(index), cy: y(value), r: 4, tabindex: 0,
+      class: `xmr-point${outside ? ' outside' : ''}${week.observedDays < 7 ? ' incomplete' : ''}`,
+      'aria-label': description,
+    });
+    point.append(svgElement('title', {}, description));
+    chart.append(point);
+  }
+}
+
+function renderThroughputCharts() {
+  if (!throughput || $('#throughput-panel').hidden) return;
+  renderControlChart('#throughput-x-chart', throughput.weeks.map((week) => week.count), throughput.mean, throughput.xLimits, 'X');
+  renderControlChart('#throughput-mr-chart', throughput.weeks.map((week) => week.movingRange), throughput.meanMR, throughput.mrLimits, 'MR');
+}
+
+new ResizeObserver(renderThroughputCharts).observe($('#throughput-x-chart'));
+new ResizeObserver(renderThroughputCharts).observe($('#throughput-mr-chart'));
+
+async function initializeThroughput() {
+  try {
+    const response = await fetch('./throughput.json', { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    throughput = analyzeThroughput(await response.json());
+    $('#throughput-weeks').textContent = throughput.weeks.length;
+    $('#throughput-total').textContent = number.format(throughput.total);
+    $('#throughput-mean').textContent = number.format(throughput.mean);
+    $('#throughput-mr').textContent = throughput.meanMR === null ? '—' : number.format(throughput.meanMR);
+    $('#throughput-range').textContent = `${formatDate(throughput.start)} – ${formatDate(throughput.through)}`;
+    const incomplete = throughput.weeks.filter((week) => week.observedDays < 7);
+    if (incomplete.length) {
+      $('#throughput-warning').textContent = `Niepełne okresy: ${incomplete.length}. Sumy obejmują tylko dni obecne w arkuszu (szczegóły w tabeli). Te okresy są uwzględnione w średnich i granicach, co może obniżać tempo i zmieniać MR.`;
+      $('#throughput-warning').hidden = false;
+    }
+    for (const [id, mean, limits] of [
+      ['x-limits', throughput.mean, throughput.xLimits],
+      ['mr-limits', throughput.meanMR, throughput.mrLimits],
+    ]) {
+      $(`#${id}`).textContent = limits
+        ? `Średnia (zielona): ${number.format(mean)} · Dolna granica (przerywana): ${number.format(limits.lower)} · Górna granica (przerywana): ${number.format(limits.upper)}`
+        : 'Za mało danych: MR i granice wymagają co najmniej dwóch tygodni.';
+    }
+    for (const week of throughput.weeks) {
+      const row = document.createElement('tr');
+      row.append(
+        cell(`${formatDate(week.start)} – ${formatDate(week.end)}`),
+        cell(number.format(week.count)),
+        cell(week.movingRange === null ? '—' : number.format(week.movingRange)),
+        cell(`${week.observedDays}/7${week.observedDays < 7 ? ' · niepełny' : ''}`),
+      );
+      $('#throughput-body').append(row);
+    }
+    $('#throughput-content').hidden = false;
+    renderThroughputCharts();
+  } catch (cause) {
+    $('#throughput-error').textContent = `Nie udało się wczytać przepustowości (${cause.message}). Sprawdź plik Throughput Daily.xlsx i publikację throughput.json.`;
+    $('#throughput-error').hidden = false;
+  } finally {
+    $('#throughput-loading').hidden = true;
+  }
+}
+
 async function initialize() {
   let base;
   try {
@@ -329,3 +478,4 @@ async function initialize() {
   render();
 }
 initialize();
+initializeThroughput();

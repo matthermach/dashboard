@@ -7,6 +7,20 @@
 .date-filter-form .text-input{width:145px;min-width:0;padding:8px;font-size:11px}
 .date-filter-form p{flex-basis:100%;font-size:10px;color:var(--muted);line-height:1.6}
 .date-filter-form .date-filter-error{color:var(--l)}
+.dashboard-tabs{display:flex;gap:8px;margin-bottom:28px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap}
+.dashboard-tab{background:transparent;color:var(--muted);padding:11px 15px;border:1px solid var(--border);font-size:12px}
+.dashboard-tab[aria-selected=true]{color:var(--lime);background:#bcf57810;border-color:#bcf57860}
+.xmr-panel{margin-bottom:24px}
+.xmr-chart{display:block;width:100%;height:310px}
+.xmr-band{fill:#bcf5780d}
+.xmr-series{fill:none;stroke:var(--m);stroke-width:2}
+.xmr-mean{stroke:var(--lime);stroke-width:1.5}
+.xmr-limit{stroke:var(--l);stroke-width:1;stroke-dasharray:6 5}
+.xmr-point{fill:var(--m);stroke:var(--m);stroke-width:2}
+.xmr-point.outside{fill:var(--l);stroke:var(--l)}
+.xmr-point.incomplete{fill:var(--panel)}
+.xmr-point:focus{outline:2px solid var(--lime);outline-offset:3px}
+.xmr-panel .chart-footer{flex-wrap:wrap}
 @media(max-width:480px){.date-filter-form{gap:10px}.date-filter-form>.filter-label{flex-basis:100%}.date-filter-form label{flex:1 1 125px}.date-filter-form .text-input{width:100%}.date-filter-form button{flex:1}}
 @media(min-width:1500px){main{padding-top:43px}.page-heading{margin-bottom:35px}#chart{height:358px}.stat-card{padding:23px}.analysis-grid{grid-template-columns:minmax(0,1fr) 305px}.add-panel .panel-heading{padding-top:27px}.add-icon{margin-bottom:20px}.text-input{padding:13px}.field-label{margin-top:21px}.form-note{margin-bottom:26px}}
 @media(max-width:1200px){.sidebar{width:195px;padding-left:12px;padding-right:12px}.main-shell{margin-left:195px}main{padding:28px 25px 0}.topbar{padding:0 25px}.stat-card{padding:16px}.stat-top{font-size:10px}.stat-foot{font-size:8px}.analysis-grid{grid-template-columns:minmax(0,1fr) 250px;gap:15px}.panel-heading{padding:20px 18px}.chart-toolbar{padding-left:18px;padding-right:18px;flex-wrap:wrap}.legend{gap:12px}.legend-muted{display:none}.chart-footer{padding:12px 18px}.chart-footer>span:last-child{display:none}#add-form{padding:0 18px}.insight{padding:15px 18px}.heading-actions{gap:7px}.heading-actions .button{padding:10px}.table-actions{flex-wrap:wrap;justify-content:flex-end}td,th{padding-left:18px;padding-right:18px}}

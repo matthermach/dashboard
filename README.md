@@ -20,6 +20,31 @@ P50, P85 i P95 są liczone dla aktywnych rozmiarów, dat i niewykluczonych punkt
 metodą interpolacji liniowej zgodną z Excel `PERCENTILE.INC`.
 To percentyle historycznej próby, nie gwarancje terminu. Jednostka: dni.
 
+## Tempo dostarczania — XMR
+
+Zakładka **Tempo dostarczania · XMR** w `index.html` korzysta z osobnego pliku
+`Throughput Daily.xlsx` (kolumny `Data (DD/MM/YYYY)` i `Przepustowość`).
+Konwerter publikuje dzienne dane jako `throughput.json`; błędne daty,
+duplikaty dni oraz ujemne, ułamkowe lub nieliczbowe wartości blokują publikację.
+Nie są wymagane biblioteki do Excela ani wykresów.
+
+Sumy tygodniowe X są liczone od **7 stycznia roku pierwszej daty w arkuszu**:
+7–13 stycznia, 14–20 stycznia itd., bez resetowania na granicy roku.
+Obecny arkusz rozpoczyna się 7 stycznia 2025 r. Dni wcześniejsze niż początek
+analizy są pomijane. Sumujemy wartości przepustowości, nie liczbę rekordów.
+MR to bezwzględna różnica dwóch kolejnych sum X; pierwszy okres nie ma MR.
+Korytarz X: **średnia X ± 2,66 × średni MR**.
+Korytarz MR: **średni MR ± 3,27 × średni MR**, zgodnie z wymaganym wzorem,
+bez obcinania dolnej granicy do zera (nie jest to standardowa granica D3/D4).
+Przy jednym tygodniu MR i korytarze nie są wyznaczane.
+
+Ostatni okres oraz inne tygodnie z mniej niż 7 dniami danych są oznaczane jako
+niepełne w tabeli, ostrzeżeniu i pustymi punktami na wykresie. Są uwzględniane
+w średnich i granicach; brakujących dni nie ekstrapolujemy. Punkty poza
+korytarzem są pomarańczowe. Tabela udostępnia dokładne sumy i MR.
+Ta zakładka nie korzysta z filtrów, lokalnych dodatków ani wykluczeń analizy
+czasów realizacji. Zakładki obsługują klawiaturę oraz adres `#throughput`.
+
 ## Dane i zapis
 
 Formularz dodaje rozmiar, dodatni czas realizacji w dniach oraz datę ukończenia.

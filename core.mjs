@@ -59,3 +59,53 @@ export function analyze(points, sizes, excluded, dateRange = {}) {
   const values = active.map((point) => point.days);
   return { visible, active, p50: percentile(values, .5), p85: percentile(values, .85), p95: percentile(values, .95) };
 }
+
+export function analyzeThroughput(days) {
+  if (!Array.isArray(days) || !days.length || days.length > 20000) {
+    throw new Error('Dane przepustowości muszą zawierać od 1 do 20 000 dni.');
+  }
+  const seen = new Set();
+  for (const day of days) {
+    if (!day || !validDate(day.date) || !Number.isSafeInteger(day.count) || day.count < 0 || seen.has(day.date)) {
+      throw new Error('Nieprawidłowe dane przepustowości: wymagane są unikalne daty i nieujemne całkowite liczby elementów.');
+    }
+    seen.add(day.date);
+  }
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  const start = `${sorted[0].date.slice(0, 4)}-01-07`;
+  const eligible = sorted.filter((day) => day.date >= start);
+  if (!eligible.length) throw new Error('Brak danych przepustowości od 7 stycznia.');
+  const dayMs = 86400000;
+  const startTime = Date.parse(`${start}T00:00:00Z`);
+  const lastTime = Date.parse(`${eligible.at(-1).date}T00:00:00Z`);
+  const weekMs = 7 * dayMs;
+  const weeks = Array.from({ length: Math.floor((lastTime - startTime) / weekMs) + 1 }, (_, index) => {
+    const time = startTime + index * weekMs;
+    return {
+      start: new Date(time).toISOString().slice(0, 10),
+      end: new Date(time + 6 * dayMs).toISOString().slice(0, 10),
+      count: 0,
+      observedDays: 0,
+    };
+  });
+  for (const day of eligible) {
+    const index = Math.floor((Date.parse(`${day.date}T00:00:00Z`) - startTime) / weekMs);
+    weeks[index].count += day.count;
+    weeks[index].observedDays++;
+    if (!Number.isSafeInteger(weeks[index].count)) throw new Error('Tygodniowa suma przepustowości przekracza bezpieczny zakres liczb.');
+  }
+  for (const [index, week] of weeks.entries()) {
+    week.movingRange = index === 0 ? null : Math.abs(week.count - weeks[index - 1].count);
+  }
+  const total = weeks.reduce((sum, week) => sum + week.count, 0);
+  if (!Number.isSafeInteger(total)) throw new Error('Łączna przepustowość przekracza bezpieczny zakres liczb.');
+  const mean = total / weeks.length;
+  const meanMR = weeks.length > 1
+    ? weeks.slice(1).reduce((sum, week) => sum + week.movingRange, 0) / (weeks.length - 1)
+    : null;
+  return {
+    start, through: eligible.at(-1).date, weeks, total, mean, meanMR,
+    xLimits: meanMR === null ? null : { lower: mean - 2.66 * meanMR, upper: mean + 2.66 * meanMR },
+    mrLimits: meanMR === null ? null : { lower: meanMR - 3.27 * meanMR, upper: meanMR + 3.27 * meanMR },
+  };
+}

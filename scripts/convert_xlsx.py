@@ -35,8 +35,8 @@ def parse_date(value):
     return result.isoformat()
 
 
-def convert():
-    with zipfile.ZipFile(ROOT / "Lead Times - 2024-25.xlsx") as workbook:
+def workbook_rows(path):
+    with zipfile.ZipFile(path) as workbook:
         shared = []
         if "xl/sharedStrings.xml" in workbook.namelist():
             shared = [
@@ -44,9 +44,6 @@ def convert():
                 for node in ET.fromstring(workbook.read("xl/sharedStrings.xml")).findall("m:si", NS)
             ]
         sheet = ET.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
-        points = []
-        occurrences = {}
-        headers = None
         for row in sheet.findall(".//m:sheetData/m:row", NS):
             cells = {}
             for cell in row.findall("m:c", NS):
@@ -59,32 +56,71 @@ def convert():
                 cells[column] = value
             if not any(str(value).strip() for value in cells.values()):
                 continue
-            if headers is None:
-                headers = cells
-                expected = {"A": "Data ukończenia", "B": "Deklarowany rozmiar", "C": "Czas realizacji"}
-                if any(cells.get(key) != value for key, value in expected.items()):
-                    raise ValueError(f"Unexpected workbook headers: {headers}")
-                continue
-            try:
-                completed = parse_date(cells["A"])
-                size = cells["B"].strip().upper()
-                days = float(cells["C"])
-                if size not in ("S", "M", "L") or not math.isfinite(days) or days <= 0:
-                    raise ValueError("Expected size S/M/L and positive finite duration")
-                identity = f"{completed}|{size}|{days:g}"
-                occurrences[identity] = occurrences.get(identity, 0) + 1
-                digest = hashlib.sha256(identity.encode()).hexdigest()[:16]
-                points.append({
-                    "id": f"xlsx-{digest}-{occurrences[identity]}",
-                    "date": completed, "size": size, "days": days, "source": "xlsx",
-                })
-            except (KeyError, ValueError, OverflowError) as error:
-                raise ValueError(f"Invalid workbook row {row.get('r')}: {error}") from error
+            yield row.get("r"), cells
+
+
+def convert():
+    points = []
+    occurrences = {}
+    headers = None
+    for row_number, cells in workbook_rows(ROOT / "Lead Times - 2024-25.xlsx"):
+        if headers is None:
+            headers = cells
+            expected = {"A": "Data ukończenia", "B": "Deklarowany rozmiar", "C": "Czas realizacji"}
+            if any(cells.get(key) != value for key, value in expected.items()):
+                raise ValueError(f"Unexpected workbook headers: {headers}")
+            continue
+        try:
+            completed = parse_date(cells["A"])
+            size = cells["B"].strip().upper()
+            days = float(cells["C"])
+            if size not in ("S", "M", "L") or not math.isfinite(days) or days <= 0:
+                raise ValueError("Expected size S/M/L and positive finite duration")
+            identity = f"{completed}|{size}|{days:g}"
+            occurrences[identity] = occurrences.get(identity, 0) + 1
+            digest = hashlib.sha256(identity.encode()).hexdigest()[:16]
+            points.append({
+                "id": f"xlsx-{digest}-{occurrences[identity]}",
+                "date": completed, "size": size, "days": days, "source": "xlsx",
+            })
+        except (KeyError, ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid workbook row {row_number}: {error}") from error
     if not points or len(points) > 20000:
         raise ValueError("Workbook must contain 1–20,000 data rows")
     (ROOT / "data.json").write_text(json.dumps(points, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Converted {len(points)} XLSX rows to data.json")
 
 
+def convert_throughput():
+    days = []
+    seen = set()
+    headers = None
+    for row_number, cells in workbook_rows(ROOT / "Throughput Daily.xlsx"):
+        if headers is None:
+            headers = cells
+            if cells.get("A") != "Data (DD/MM/YYYY)" or cells.get("B") != "Przepustowość":
+                raise ValueError(f"Unexpected throughput headers: {headers}")
+            continue
+        try:
+            completed = parse_date(cells["A"])
+            count = float(cells["B"])
+            if not math.isfinite(count) or count < 0 or not count.is_integer():
+                raise ValueError("Expected a non-negative integer throughput")
+            if completed in seen:
+                raise ValueError(f"Duplicate date: {completed}")
+            seen.add(completed)
+            days.append({"date": completed, "count": int(count)})
+        except (KeyError, ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid throughput row {row_number}: {error}") from error
+    if not days or len(days) > 20000:
+        raise ValueError("Throughput workbook must contain 1–20,000 daily rows")
+    days.sort(key=lambda day: day["date"])
+    (ROOT / "throughput.json").write_text(
+        json.dumps(days, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"Converted {len(days)} XLSX rows to throughput.json")
+
+
 if __name__ == "__main__":
     convert()
+    convert_throughput()
