@@ -60,6 +60,54 @@ export function analyze(points, sizes, excluded, dateRange = {}) {
   return { visible, active, p50: percentile(values, .5), p85: percentile(values, .85), p95: percentile(values, .95) };
 }
 
+export const CONTROL_SIGNALS = [
+  { id: 'outside', label: 'Przypisywalna przyczyna: punkt poza korytarzem' },
+  { id: 'two-of-three', label: 'Umiarkowany sygnał: 2 z 3 poza 2σ' },
+  { id: 'three-of-five', label: 'Umiarkowany sygnał: 3 z 5 poza 1σ' },
+  { id: 'shift', label: 'Niewielka trwała zmiana: 8 po jednej stronie średniej' },
+];
+
+export function analyzeControlChart(values, mean, halfWidth) {
+  if (!Array.isArray(values) || values.some((value) => value !== null && (!Number.isFinite(value) || value < 0))
+    || (mean !== null && (!Number.isFinite(mean) || mean < 0))
+    || (mean === null && values.some((value) => value !== null))
+    || (halfWidth !== null && (!Number.isFinite(halfWidth) || halfWidth < 0 || mean === null))) {
+    throw new Error('Nieprawidłowe wartości, średnia lub szerokość korytarza wykresu kontrolnego.');
+  }
+  const signals = values.map(() => []);
+  if (halfWidth === null) return { mean, sigma: null, limits: null, zones: [], signals };
+  const sigma = halfWidth / 3;
+  const limits = { lower: Math.max(0, mean - halfWidth), upper: mean + halfWidth };
+  const zones = [1, 2].map((multiple) => ({
+    multiple, lower: Math.max(0, mean - multiple * sigma), upper: mean + multiple * sigma,
+  }));
+  for (const [index, value] of values.entries()) {
+    if (value !== null && (value < limits.lower || value > limits.upper)) signals[index].push('outside');
+  }
+  for (const { id, size, required, threshold } of [
+    { id: 'two-of-three', size: 3, required: 2, threshold: 2 * sigma },
+    { id: 'three-of-five', size: 5, required: 3, threshold: sigma },
+    { id: 'shift', size: 8, required: 8, threshold: 0 },
+  ]) {
+    for (let end = size - 1; end < values.length; end++) {
+      const start = end - size + 1;
+      const window = values.slice(start, end + 1);
+      if (window.includes(null)) continue;
+      for (const direction of [-1, 1]) {
+        const qualifying = window.flatMap((value, offset) => {
+          const beyond = direction === 1 ? value > mean + threshold : value < mean - threshold;
+          return beyond ? [start + offset] : [];
+        });
+        if (qualifying.length < required) continue;
+        for (const index of qualifying) {
+          if (!signals[index].includes(id)) signals[index].push(id);
+        }
+      }
+    }
+  }
+  return { mean, sigma, limits, zones, signals };
+}
+
 export function analyzeThroughput(days) {
   if (!Array.isArray(days) || !days.length || days.length > 20000) {
     throw new Error('Dane przepustowości muszą zawierać od 1 do 20 000 dni.');
@@ -103,9 +151,10 @@ export function analyzeThroughput(days) {
   const meanMR = weeks.length > 1
     ? weeks.slice(1).reduce((sum, week) => sum + week.movingRange, 0) / (weeks.length - 1)
     : null;
+  const xChart = analyzeControlChart(weeks.map((week) => week.count), mean, meanMR === null ? null : 2.66 * meanMR);
+  const mrChart = analyzeControlChart(weeks.map((week) => week.movingRange), meanMR, meanMR === null ? null : 3.27 * meanMR);
   return {
     start, through: eligible.at(-1).date, weeks, total, mean, meanMR,
-    xLimits: meanMR === null ? null : { lower: mean - 2.66 * meanMR, upper: mean + 2.66 * meanMR },
-    mrLimits: meanMR === null ? null : { lower: meanMR - 3.27 * meanMR, upper: meanMR + 3.27 * meanMR },
+    xLimits: xChart.limits, mrLimits: mrChart.limits, xChart, mrChart,
   };
 }

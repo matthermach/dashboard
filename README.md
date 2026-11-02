@@ -33,15 +33,34 @@ Sumy tygodniowe X są liczone od **7 stycznia roku pierwszej daty w arkuszu**:
 Obecny arkusz rozpoczyna się 7 stycznia 2025 r. Dni wcześniejsze niż początek
 analizy są pomijane. Sumujemy wartości przepustowości, nie liczbę rekordów.
 MR to bezwzględna różnica dwóch kolejnych sum X; pierwszy okres nie ma MR.
-Korytarz X: **średnia X ± 2,66 × średni MR**.
-Korytarz MR: **średni MR ± 3,27 × średni MR**, zgodnie z wymaganym wzorem,
-bez obcinania dolnej granicy do zera (nie jest to standardowa granica D3/D4).
-Przy jednym tygodniu MR i korytarze nie są wyznaczane.
+Korytarz X: **max(0, średnia X − 2,66 × średni MR)** do
+**średnia X + 2,66 × średni MR**.
+Korytarz MR: **max(0, średni MR − 3,27 × średni MR)** do
+**średni MR + 3,27 × średni MR** (nie jest to standardowa granica D3/D4).
+Przy jednym tygodniu MR, korytarze i sygnały nie są wyznaczane.
+
+Oba wykresy wykrywają cztery sygnały: **czerwony** punkt poza korytarzem
+(zjawisko o przypisywalnej przyczynie), **pomarańczowe** 2 z 3 kolejnych
+wartości poza 2σ (umiarkowany sygnał), **żółte** 3 z 5 poza 1σ (umiarkowany
+sygnał) oraz **białą** serię 8 punktów po jednej stronie średniej (niewielka
+trwała zmiana). Dla reguł 2 z 3 i 3 z 5 przekroczenia muszą leżeć po tej
+samej stronie średniej. Wymagamy pełnego okna kolejnych wartości; brak MR
+przerywa okno. Równość z linią nie jest przekroczeniem, a równość ze średnią
+przerywa serię. Oznaczamy wszystkie punkty spełniające warunek w danym oknie;
+przy serii 8 punktów całą serię, także gdy jest dłuższa niż 8.
+
+Sigma to 1/3 nieobciętej połowy szerokości korytarza:
+**σ X = 2,66 × średni MR / 3**, **σ MR = 3,27 × średni MR / 3**.
+Obcięcie dolnych granic do zera nie zmienia sigmy. Linie 1σ są żółte,
+2σ pomarańczowe, korytarz czerwony, a średnia zielona. Przy nakładaniu się
+sygnałów kolor punktu ma priorytet: czerwony, pomarańczowy, żółty, biały.
+Opis punktu i tabela pokazują wszystkie sygnały, bez utraty tych o niższym
+priorytecie. Podsumowania liczą oznaczone punkty (nie okna).
 
 Ostatni okres oraz inne tygodnie z mniej niż 7 dniami danych są oznaczane jako
 niepełne w tabeli, ostrzeżeniu i pustymi punktami na wykresie. Są uwzględniane
-w średnich i granicach; brakujących dni nie ekstrapolujemy. Punkty poza
-korytarzem są pomarańczowe. Tabela udostępnia dokładne sumy i MR.
+w średnich, granicach i sygnałach; brakujących dni nie ekstrapolujemy.
+Tabela udostępnia dokładne sumy, MR oraz sygnały obu wykresów.
 Ta zakładka nie korzysta z filtrów, lokalnych dodatków ani wykluczeń analizy
 czasów realizacji. Zakładki obsługują klawiaturę oraz adres `#throughput`.
 
