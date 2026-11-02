@@ -1,4 +1,4 @@
-import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze, analyzeThroughput } from './core.mjs';
+import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze, analyzeThroughput, CONTROL_SIGNALS } from './core.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const colors = { S: '#bcf578', M: '#ab9bff', L: '#f6af73' };
@@ -333,7 +333,12 @@ for (const [index, tab] of [...document.querySelectorAll('[role="tab"]')].entrie
 window.addEventListener('hashchange', () => selectView(location.hash === '#throughput'));
 selectView(location.hash === '#throughput');
 
-function renderControlChart(selector, values, mean, limits, label) {
+function signalDescription(signals) {
+  return CONTROL_SIGNALS.filter((signal) => signals.includes(signal.id)).map((signal) => signal.label).join('; ') || 'Brak sygnału';
+}
+
+function renderControlChart(selector, values, model, label) {
+  const { mean, limits, zones, signals } = model;
   const chart = $(selector);
   chart.replaceChildren();
   const width = Math.max(260, chart.getBoundingClientRect().width);
@@ -346,7 +351,7 @@ function renderControlChart(selector, values, mean, limits, label) {
   const low = Math.min(0, ...numbers, limits?.lower ?? 0);
   const high = Math.max(1, ...numbers, limits?.upper ?? 0);
   const padding = (high - low) * .08;
-  const minY = low - padding;
+  const minY = 0;
   const maxY = high + padding;
   const x = (index) => margin.left + (values.length === 1 ? .5 : index / (values.length - 1)) * plotWidth;
   const y = (value) => margin.top + (maxY - value) / (maxY - minY) * plotHeight;
@@ -360,6 +365,17 @@ function renderControlChart(selector, values, mean, limits, label) {
     const value = low + (high - low) * index / 5;
     chart.append(svgElement('line', { x1: margin.left, x2: width - margin.right, y1: y(value), y2: y(value), class: 'chart-grid' }));
     chart.append(svgElement('text', { x: margin.left - 10, y: y(value) + 3, 'text-anchor': 'end', class: 'chart-axis' }, number.format(value)));
+  }
+  for (const zone of zones) {
+    for (const [side, value] of [['Dolna', zone.lower], ['Górna', zone.upper]]) {
+      if (value === mean || value === limits.lower || value === limits.upper) continue;
+      const line = svgElement('line', {
+        x1: margin.left, x2: width - margin.right, y1: y(value), y2: y(value),
+        class: `xmr-sigma xmr-sigma-${zone.multiple}`,
+      });
+      line.append(svgElement('title', {}, `${side} linia ${zone.multiple}σ: ${number.format(value)}`));
+      chart.append(line);
+    }
   }
   for (const [value, name, className] of [
     [mean, 'Średnia', 'xmr-mean'],
@@ -386,11 +402,12 @@ function renderControlChart(selector, values, mean, limits, label) {
   for (const [index, value] of values.entries()) {
     if (value === null) continue;
     const week = throughput.weeks[index];
-    const outside = limits && (value < limits.lower || value > limits.upper);
-    const description = `${formatDate(week.start)} – ${formatDate(week.end)}: ${label} = ${number.format(value)}${outside ? ', poza korytarzem' : ''}. Dane: ${week.observedDays}/7 dni.`;
+    const pointSignals = signals[index];
+    const description = `${formatDate(week.start)} – ${formatDate(week.end)}: ${label} = ${number.format(value)}. ${signalDescription(pointSignals)}. Dane: ${week.observedDays}/7 dni.`;
     const point = svgElement('circle', {
-      cx: x(index), cy: y(value), r: 4, tabindex: 0,
-      class: `xmr-point${outside ? ' outside' : ''}${week.observedDays < 7 ? ' incomplete' : ''}`,
+      cx: x(index), cy: y(value), r: pointSignals.length ? 6 : 4, tabindex: 0,
+      class: `xmr-point${pointSignals.length ? ` signal-${pointSignals[0]}` : ''}${week.observedDays < 7 ? ' incomplete' : ''}`,
+      'data-signals': pointSignals.join(' '),
       'aria-label': description,
     });
     point.append(svgElement('title', {}, description));
@@ -400,8 +417,8 @@ function renderControlChart(selector, values, mean, limits, label) {
 
 function renderThroughputCharts() {
   if (!throughput || $('#throughput-panel').hidden) return;
-  renderControlChart('#throughput-x-chart', throughput.weeks.map((week) => week.count), throughput.mean, throughput.xLimits, 'X');
-  renderControlChart('#throughput-mr-chart', throughput.weeks.map((week) => week.movingRange), throughput.meanMR, throughput.mrLimits, 'MR');
+  renderControlChart('#throughput-x-chart', throughput.weeks.map((week) => week.count), throughput.xChart, 'X');
+  renderControlChart('#throughput-mr-chart', throughput.weeks.map((week) => week.movingRange), throughput.mrChart, 'MR');
 }
 
 new ResizeObserver(renderThroughputCharts).observe($('#throughput-x-chart'));
@@ -422,15 +439,19 @@ async function initializeThroughput() {
       $('#throughput-warning').textContent = `Niepełne okresy: ${incomplete.length}. Sumy obejmują tylko dni obecne w arkuszu (szczegóły w tabeli). Te okresy są uwzględnione w średnich i granicach, co może obniżać tempo i zmieniać MR.`;
       $('#throughput-warning').hidden = false;
     }
-    for (const [id, mean, limits] of [
-      ['x-limits', throughput.mean, throughput.xLimits],
-      ['mr-limits', throughput.meanMR, throughput.mrLimits],
+    for (const [id, model] of [
+      ['x-limits', throughput.xChart],
+      ['mr-limits', throughput.mrChart],
     ]) {
+      const { mean, limits, zones, signals } = model;
       $(`#${id}`).textContent = limits
-        ? `Średnia (zielona): ${number.format(mean)} · Dolna granica (przerywana): ${number.format(limits.lower)} · Górna granica (przerywana): ${number.format(limits.upper)}`
+        ? `Średnia (zielona): ${number.format(mean)} · Dolna granica: ${number.format(limits.lower)} · Górna granica: ${number.format(limits.upper)}${zones.map((zone) => ` · ${zone.multiple}σ: ${number.format(zone.lower)} – ${number.format(zone.upper)}`).join('')}`
         : 'Za mało danych: MR i granice wymagają co najmniej dwóch tygodni.';
+      $(`#${id.replace('limits', 'signals')}`).textContent = signals.some((point) => point.length)
+        ? `Oznaczone punkty: ${signals.filter((point) => point.length).length}. ${CONTROL_SIGNALS.map((signal) => `${signal.label}: ${signals.filter((point) => point.includes(signal.id)).length}`).join(' · ')}`
+        : 'Brak sygnałów dla dostępnych danych.';
     }
-    for (const week of throughput.weeks) {
+    for (const [index, week] of throughput.weeks.entries()) {
       const row = document.createElement('tr');
       row.append(
         cell(`${formatDate(week.start)} – ${formatDate(week.end)}`),
@@ -438,6 +459,17 @@ async function initializeThroughput() {
         cell(week.movingRange === null ? '—' : number.format(week.movingRange)),
         cell(`${week.observedDays}/7${week.observedDays < 7 ? ' · niepełny' : ''}`),
       );
+      for (const signals of [throughput.xChart.signals[index], throughput.mrChart.signals[index]]) {
+        const signalCell = cell();
+        if (!signals.length) signalCell.textContent = '—';
+        for (const signal of CONTROL_SIGNALS.filter((rule) => signals.includes(rule.id))) {
+          const badge = document.createElement('span');
+          badge.className = `signal-badge signal-${signal.id}`;
+          badge.textContent = signal.label;
+          signalCell.append(badge);
+        }
+        row.append(signalCell);
+      }
       $('#throughput-body').append(row);
     }
     $('#throughput-content').hidden = false;

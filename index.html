@@ -96,21 +96,29 @@
             <article class="stat-card"><div class="stat-top">Średni moving range · MR̄</div><div class="stat-value" id="throughput-mr">—</div><div class="stat-foot">Średnia bezwzględnych zmian tydzień do tygodnia</div></article>
           </section>
           <p id="throughput-warning" class="notice" hidden></p>
+          <div class="panel signal-legend" aria-label="Legenda sygnałów X i MR">
+            <span class="signal-outside"><i class="dot" aria-hidden="true"></i>Punkt poza korytarzem · przypisywalna przyczyna</span>
+            <span class="signal-two-of-three"><i class="dot" aria-hidden="true"></i>2 z 3 poza 2σ · umiarkowany sygnał</span>
+            <span class="signal-three-of-five"><i class="dot" aria-hidden="true"></i>3 z 5 poza 1σ · umiarkowany sygnał</span>
+            <span class="signal-shift"><i class="dot" aria-hidden="true"></i>8 po jednej stronie średniej · niewielka trwała zmiana</span>
+          </div>
           <section class="panel xmr-panel" aria-labelledby="x-title">
-            <div class="panel-heading"><div><h2 id="x-title">X · tempo dostarczania</h2><p>Suma elementów w tygodniu. Korytarz: X̄ − 2,66 × MR̄ do X̄ + 2,66 × MR̄.</p></div></div>
+            <div class="panel-heading"><div><h2 id="x-title">X · tempo dostarczania</h2><p>Suma elementów w tygodniu. Korytarz: max(0, X̄ − 2,66 × MR̄) do X̄ + 2,66 × MR̄.</p></div></div>
             <div class="chart-wrap"><div class="axis-title">Ukończone elementy / tydzień</div><svg id="throughput-x-chart" class="xmr-chart" role="img" aria-label="Wykres X tygodniowego tempa dostarczania" aria-describedby="throughput-method"></svg></div>
             <p class="chart-footer" id="x-limits"></p>
+            <p class="signal-summary" id="x-signals"></p>
           </section>
           <section class="panel xmr-panel" aria-labelledby="mr-title">
-            <div class="panel-heading"><div><h2 id="mr-title">MR · zmienność tempa</h2><p>MR = |X bieżącego tygodnia − X poprzedniego tygodnia|. Korytarz: MR̄ − 3,27 × MR̄ do MR̄ + 3,27 × MR̄.</p></div></div>
+            <div class="panel-heading"><div><h2 id="mr-title">MR · zmienność tempa</h2><p>MR = |X bieżącego tygodnia − X poprzedniego tygodnia|. Korytarz: max(0, MR̄ − 3,27 × MR̄) do MR̄ + 3,27 × MR̄.</p></div></div>
             <div class="chart-wrap"><div class="axis-title">Bezwzględna zmiana liczby elementów</div><svg id="throughput-mr-chart" class="xmr-chart" role="img" aria-label="Wykres MR zmian tygodniowego tempa dostarczania" aria-describedby="throughput-method"></svg></div>
             <p class="chart-footer" id="mr-limits"></p>
+            <p class="signal-summary" id="mr-signals"></p>
           </section>
           <section class="panel data-panel" aria-labelledby="throughput-data-title">
-            <div class="panel-heading"><div><h2 id="throughput-data-title">Dane tygodniowe</h2><p>Dokładne wartości X i MR oraz kompletność każdego okresu.</p></div></div>
-            <div class="table-scroll"><table><thead><tr><th scope="col">TYDZIEŃ OD–DO</th><th scope="col">X · ELEMENTY</th><th scope="col">MR</th><th scope="col">DNI W ARKUSZU</th></tr></thead><tbody id="throughput-body"></tbody></table></div>
+            <div class="panel-heading"><div><h2 id="throughput-data-title">Dane tygodniowe</h2><p>Dokładne wartości X i MR, kompletność okresów oraz wszystkie wykryte sygnały.</p></div></div>
+            <div class="table-scroll"><table><thead><tr><th scope="col">TYDZIEŃ OD–DO</th><th scope="col">X · ELEMENTY</th><th scope="col">MR</th><th scope="col">DNI W ARKUSZU</th><th scope="col">SYGNAŁY X</th><th scope="col">SYGNAŁY MR</th></tr></thead><tbody id="throughput-body"></tbody></table></div>
           </section>
-          <div class="method" id="throughput-method"><p>Tygodnie to kolejne okresy 7 dni od 7 stycznia roku pierwszej daty w arkuszu (7–13 stycznia, 14–20 stycznia itd.), także przez granicę roku. Sumujemy dzienne wartości, a nie liczbę wierszy. Pierwszy tydzień nie ma MR. Średnie i granice liczymy dla wszystkich pokazanych okresów, także niepełnych; nie ekstrapolujemy brakujących dni. Kropki w kolorze pomarańczowym przekraczają granice, a puste kropki oznaczają niepełny tydzień. Dolne granice pozostają zgodne z wzorami, nawet gdy są ujemne. Dla jednego tygodnia nie wyznaczamy MR ani korytarzy.</p><p>Źródło: <a href="./Throughput%20Daily.xlsx" download>Throughput Daily.xlsx</a>. Ta analiza jest niezależna od filtrów, lokalnych dodatków i wykluczeń w zakładce czasów realizacji.</p></div>
+          <div class="method" id="throughput-method"><p>Tygodnie to kolejne okresy 7 dni od 7 stycznia roku pierwszej daty w arkuszu (7–13 stycznia, 14–20 stycznia itd.), także przez granicę roku. Sumujemy dzienne wartości, a nie liczbę wierszy. Pierwszy tydzień nie ma MR. Średnie i granice liczymy dla wszystkich pokazanych okresów, także niepełnych; nie ekstrapolujemy brakujących dni. Puste kropki oznaczają niepełny tydzień. Dolne granice korytarzy i linii sigma nie spadają poniżej zera. Dla jednego tygodnia nie wyznaczamy MR, korytarzy ani sygnałów.</p><p>Na obu wykresach przyjmujemy 3σ jako nieobciętą połowę szerokości korytarza: σ X = 2,66 × MR̄ / 3, a σ MR = 3,27 × MR̄ / 3. Linie 1σ są żółte, 2σ pomarańczowe, granice korytarza czerwone, a średnia zielona. Obcięcie dolnej granicy do zera nie zmienia σ. Sygnały 2 z 3 oraz 3 z 5 wymagają wartości poza odpowiednią linią po tej samej stronie średniej, w pełnym oknie kolejnych tygodni. Oznaczamy wszystkie punkty spełniające warunek w takim oknie, a przy serii 8 punktów całą serię. Punkt na linii nie przekracza jej; punkt równy średniej przerywa serię. Brak wartości MR przerywa okno.</p><p>Czerwony punkt sygnalizuje zjawisko o przypisywalnej przyczynie (poza korytarzem), pomarańczowy i żółty to umiarkowane sygnały (odpowiednio 2 z 3 poza 2σ oraz 3 z 5 poza 1σ), a biały to niewielka trwała zmiana (8 po jednej stronie średniej). Jeśli sygnały się nakładają, kolor ma priorytet: czerwony, pomarańczowy, żółty, biały. Wszystkie przyczyny oznaczenia są opisane przy punkcie oraz w tabeli; podsumowania liczą punkty, nie liczbę nakładających się okien.</p><p>Źródło: <a href="./Throughput%20Daily.xlsx" download>Throughput Daily.xlsx</a>. Ta analiza jest niezależna od filtrów, lokalnych dodatków i wykluczeń w zakładce czasów realizacji.</p></div>
         </div>
       </section>
     </main>
