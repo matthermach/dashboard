@@ -1,4 +1,4 @@
-import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, analyze } from './core.mjs';
+import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze } from './core.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const colors = { S: '#bcf578', M: '#ab9bff', L: '#f6af73' };
@@ -6,7 +6,7 @@ const number = new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 });
 const dateFormat = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const shortDate = new Intl.DateTimeFormat('pl-PL', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 const dayMs = 86400000;
-const state = { points: [], excluded: new Set(), sizes: new Set(SIZES), ready: false, recovery: false };
+const state = { points: [], excluded: new Set(), sizes: new Set(SIZES), dateRange: {}, ready: false, recovery: false };
 let analysis;
 
 function announce(message) { $('#status').textContent = message; }
@@ -30,7 +30,7 @@ function formatDate(value) { return dateFormat.format(new Date(`${value}T00:00:0
 function timestamp(point) { return Date.parse(`${point.date}T00:00:00Z`); }
 
 function render() {
-  analysis = analyze(state.points, state.sizes, state.excluded);
+  analysis = analyze(state.points, state.sizes, state.excluded, state.dateRange);
   const { visible, active } = analysis;
   $('#sample-count').textContent = active.length;
   const excludedCount = visible.length - active.length;
@@ -218,6 +218,28 @@ for (const button of document.querySelectorAll('[data-size]')) {
     announce(`W analizie: ${analysis.active.length} elementów.`);
   });
 }
+$('#date-filter-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!state.ready) return;
+  const dateRange = { from: $('#date-from').value, to: $('#date-to').value };
+  try {
+    validateDateRange(dateRange);
+    state.dateRange = dateRange;
+    $('#date-filter-error').hidden = true;
+    render();
+    announce(`Zastosowano zakres dat ukończenia. W analizie: ${analysis.active.length} elementów.`);
+  } catch (cause) {
+    $('#date-filter-error').textContent = cause.message;
+    $('#date-filter-error').hidden = false;
+  }
+});
+$('#date-filter-form').addEventListener('reset', () => {
+  state.dateRange = {};
+  $('#date-filter-error').hidden = true;
+  if (!state.ready) return;
+  render();
+  announce(`Wyczyszczono filtr dat. W analizie: ${analysis.active.length} elementów.`);
+});
 $('#show-excluded').addEventListener('change', renderChart);
 $('#restore-button').addEventListener('click', () => {
   if (!state.ready) return;
@@ -243,7 +265,9 @@ $('#add-form').addEventListener('submit', (event) => {
     render();
     $('#duration').value = '';
     $('#duration').focus();
-    announce(`Dodano element ${point.size}, ${number.format(point.days)} dni.${saved ? ' Zapisano lokalnie.' : ' Zapis lokalny nie powiódł się.'}`);
+    const outsideRange = (state.dateRange.from && point.date < state.dateRange.from)
+      || (state.dateRange.to && point.date > state.dateRange.to);
+    announce(`Dodano element ${point.size}, ${number.format(point.days)} dni.${saved ? ' Zapisano lokalnie.' : ' Zapis lokalny nie powiódł się.'}${outsideRange ? ' Punkt poza wybranym zakresem dat — wyczyść filtr dat, aby go zobaczyć.' : ''}`);
   } catch (cause) { error(`Nie dodano elementu: ${cause.message}`); }
 });
 $('#export-button').addEventListener('click', () => {
