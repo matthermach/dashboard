@@ -74,6 +74,7 @@ Wymagania: Python 3.10+ i Node.js 18+ do testów. Brak zależności pakietowych.
 ```sh
 python3 scripts/convert_xlsx.py
 node --test tests/*.test.mjs
+python3 -m unittest discover -s tests -p 'test_*.py'
 python3 -m http.server 8000
 ```
 
@@ -82,3 +83,11 @@ GitHub Pages publikuje workflow `.github/workflows/pages.yml`; w ustawieniach
 repozytorium źródłem Pages powinno być **GitHub Actions**.
 Wykres, obliczenia i dane nie wymagają zewnętrznych bibliotek ani usług.
 Krój pisma jest pobierany z Google Fonts, z systemowym fontem zastępczym.
+
+Publikacja uruchamia `python3 scripts/build_site.py`, który tworzy `_site/`.
+Moduły źródłowe `.mjs` są publikowane jako `.js`, aby serwer podawał typ MIME
+obsługiwany przez przeglądarki. Nazwy skryptów i CSS zawierają skrót zawartości;
+zmiana modułu bazowego zmienia też adres skryptu aplikacji. Dzięki temu nowy
+HTML nie korzysta ze starszych skryptów z pamięci podręcznej przeglądarki.
+Aby odtworzyć publikację lokalnie, uruchom konwersję, budowanie i
+`python3 -m http.server 8000 --directory _site`.
