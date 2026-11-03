@@ -25,6 +25,15 @@ class BuildSiteTest(unittest.TestCase):
             self.assertEqual(core_name, builder.asset_name("core", (ROOT / "core.mjs").read_text(), "js"))
             self.assertEqual((output / css_name).read_bytes(), (ROOT / "styles.css").read_bytes())
             self.assertNotIn(".mjs", app)
+            roadmap_name = re.search(r"from '\./(roadmap-[a-f0-9]+\.js)'", app)[1]
+            roadmap = (output / roadmap_name).read_text()
+            roadmap_core_name = re.search(r"from '\./(roadmap-core-[a-f0-9]+\.js)'", roadmap)[1]
+            roadmap_core = (output / roadmap_core_name).read_text()
+            self.assertEqual(roadmap_name, builder.asset_name("roadmap", roadmap, "js"))
+            self.assertEqual(roadmap_core_name, builder.asset_name("roadmap-core", roadmap_core, "js"))
+            self.assertIn(f"'./{core_name}'", roadmap_core)
+            self.assertNotIn(".mjs", roadmap)
+            self.assertNotIn(".mjs", roadmap_core)
             self.assertNotIn('src="./app.mjs"', html)
             self.assertFalse(list(output.glob("*.mjs")))
             for name in ["data.json", "throughput.json", "Lead Times - 2024-25.xlsx", "Throughput Daily.xlsx"]:
@@ -34,7 +43,7 @@ class BuildSiteTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in [
-                "index.html", "app.mjs", "core.mjs", "styles.css",
+                "index.html", "app.mjs", "core.mjs", "roadmap.mjs", "roadmap-core.mjs", "styles.css",
                 "data.json", "throughput.json", "Lead Times - 2024-25.xlsx", "Throughput Daily.xlsx",
             ]:
                 shutil.copyfile(ROOT / name, root / name)

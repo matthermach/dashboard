@@ -64,7 +64,48 @@ Tabela udostępnia dokładne sumy, MR oraz sygnały obu wykresów.
 Ta zakładka nie korzysta z filtrów, lokalnych dodatków ani wykluczeń analizy
 czasów realizacji. Zakładki obsługują klawiaturę oraz adres `#throughput`.
 
-## Dane i zapis
+## Roadmapa — wiele zespołów i Monte Carlo
+
+Nowa zakładka **Roadmapa · Monte Carlo** (`#roadmap`) umożliwia dodawanie,
+edycję i usuwanie kompetencji, nazwanych zespołów oraz co najmniej dwóch
+inicjatyw. Checkboxy przypisują kompetencje zespołom i zespoły inicjatywom.
+Kalendarz obejmuje 12 miesięcy od wybranego miesiąca (domyślnie bieżącego).
+Capacity to dostępne **osobodni zespołu dla kompetencji w miesiącu**;
+brak wpisanej capacity oznacza 0. Zmiana początku kalendarza zachowuje
+wcześniejsze wpisy, ale prognoza korzysta tylko z widocznych 12 miesięcy.
+
+Każdy element inicjatywy ma nazwę, zespół, kompetencję, estymaty min/max
+w osobodniach, opcjonalny najwcześniejszy start i opcjonalny **fixed date**.
+Inicjatywa również ma start i opcjonalny fixed date. Pracę wymagającą kilku
+zespołów/kompetencji rozbij na osobne elementy. Strzałki zmieniają priorytet:
+najpierw kolejność inicjatyw, potem kolejność ich elementów. Usunięcie zespołu,
+kompetencji lub przypisania usuwa powiązane elementy po potwierdzeniu.
+
+Model wykonuje 2 000 powtarzalnych symulacji, niezależnie losując wysiłek
+z rozkładu jednostajnego min–max. Miesięczna capacity jest równomiernie
+rozłożona na poniedziałki–piątki; święta i urlopy należy odjąć samodzielnie.
+Wspólne pule zespół–kompetencja są rezerwowane tylko raz, zgodnie z priorytetem.
+Różne pule działają równolegle; model nie zakłada zależności finish-to-start.
+Nie licz tej samej osoby w kilku pulach kompetencji. Elementy o późniejszym
+starcie nie zabierają capacity przed swoją datą startu.
+
+**P85** to najwcześniejsza data z ukończeniem w co najmniej 85% symulacji
+(percentyl najbliższej rangi). Nieukończone próby pozostają w mianowniku.
+Dla inicjatywy najpierw wyznaczamy koniec wszystkich elementów w każdej
+symulacji, potem percentyl. Gantt pokazuje start P50 → koniec P85 i termin
+fixed date, a opisy wierszy udostępniają P50, P85, szansę ukończenia w roku
+i szansę dotrzymania terminu. Fixed date nie wymusza ukończenia ani nie dodaje
+capacity; wynik poniżej 85% jest ostrzeżeniem. Brak capacity i przekroczenie
+kalendarza dają wynik „Poza horyzontem”, nie wymyśloną datę.
+
+Plan zapisuje się pod osobnym kluczem `flowlens-roadmap-v1` w `localStorage`.
+Eksport/import JSON jest niezależny od danych przepływu, a import zastępuje
+plan po potwierdzeniu. Uszkodzony zapis nie jest automatycznie nadpisywany.
+Każda zmiana unieważnia wynik; ponownie wybierz **Oblicz prognozę P85**.
+Limity: 30 kompetencji, 50 zespołów, 50 inicjatyw, 100 elementów łącznie.
+Prognoza zależy od założeń, nie jest gwarancją daty.
+
+## Dane przepływu i zapis
 
 Formularz dodaje rozmiar, dodatni czas realizacji w dniach oraz datę ukończenia.
 Nowe punkty i wykluczenia zapisują się w `localStorage` przeglądarki pod kluczem

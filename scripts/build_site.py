@@ -16,10 +16,23 @@ def build(root=ROOT, output=None):
     output.mkdir(parents=True, exist_ok=True)
     core = (root / "core.mjs").read_text(encoding="utf-8")
     core_name = asset_name("core", core, "js")
+    roadmap_core = (root / "roadmap-core.mjs").read_text(encoding="utf-8")
+    if roadmap_core.count("'./core.mjs'") != 1:
+        raise ValueError("Expected exactly one core module import in roadmap-core.mjs")
+    roadmap_core = roadmap_core.replace("'./core.mjs'", f"'./{core_name}'")
+    roadmap_core_name = asset_name("roadmap-core", roadmap_core, "js")
+    roadmap = (root / "roadmap.mjs").read_text(encoding="utf-8")
+    if roadmap.count("'./roadmap-core.mjs'") != 1:
+        raise ValueError("Expected exactly one roadmap core import in roadmap.mjs")
+    roadmap = roadmap.replace("'./roadmap-core.mjs'", f"'./{roadmap_core_name}'")
+    roadmap_name = asset_name("roadmap", roadmap, "js")
     app = (root / "app.mjs").read_text(encoding="utf-8")
     if app.count("'./core.mjs'") != 1:
         raise ValueError("Expected exactly one core module import in app.mjs")
     app = app.replace("'./core.mjs'", f"'./{core_name}'")
+    if app.count("'./roadmap.mjs'") != 1:
+        raise ValueError("Expected exactly one roadmap module import in app.mjs")
+    app = app.replace("'./roadmap.mjs'", f"'./{roadmap_name}'")
     app_name = asset_name("app", app, "js")
     styles = (root / "styles.css").read_text(encoding="utf-8")
     styles_name = asset_name("styles", styles, "css")
@@ -30,6 +43,7 @@ def build(root=ROOT, output=None):
     html = html.replace('href="./styles.css"', f'href="./{styles_name}"')
     for name, content in [
         ("index.html", html), (core_name, core), (app_name, app), (styles_name, styles),
+        (roadmap_core_name, roadmap_core), (roadmap_name, roadmap),
     ]:
         (output / name).write_text(content, encoding="utf-8")
     for name in ["data.json", "throughput.json", "Lead Times - 2024-25.xlsx", "Throughput Daily.xlsx"]:

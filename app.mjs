@@ -1,4 +1,5 @@
 import { SIZES, STORAGE_KEY, validDate, validatePoints, validateBackup, validateDateRange, analyze, analyzeThroughput, CONTROL_SIGNALS } from './core.mjs';
+import { initializeRoadmap } from './roadmap.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const colors = { S: '#bcf578', M: '#ab9bff', L: '#f6af73' };
@@ -302,36 +303,42 @@ $('#import-file').addEventListener('change', async (event) => {
 });
 new ResizeObserver(() => renderChart()).observe($('#chart-wrap'));
 
-function selectView(isThroughput) {
-  for (const [id, selected] of [['lead-time', !isThroughput], ['throughput', isThroughput]]) {
+const views = ['lead-time', 'throughput', 'roadmap'];
+const viewHash = (id) => id === 'lead-time' ? '#overview' : `#${id}`;
+function selectedView() { return views.find((id) => viewHash(id) === location.hash) || 'lead-time'; }
+function selectView(view) {
+  for (const id of views) {
+    const selected = id === view;
     $(`#${id}-tab`).setAttribute('aria-selected', selected);
     $(`#${id}-tab`).tabIndex = selected ? 0 : -1;
     $(`#${id}-panel`).hidden = !selected;
   }
-  $('#current-view').textContent = isThroughput ? 'Tempo dostarczania' : 'Czasy realizacji';
+  $('#current-view').textContent = { 'lead-time': 'Czasy realizacji', throughput: 'Tempo dostarczania', roadmap: 'Roadmapa i prognozy' }[view];
   for (const link of document.querySelectorAll('.nav-link')) {
-    link.classList.toggle('active', link.hash === (isThroughput ? '#throughput' : '#overview'));
+    link.classList.toggle('active', link.hash === viewHash(view));
   }
-  if (isThroughput) renderThroughputCharts();
-  else renderChart();
+  if (view === 'throughput') renderThroughputCharts();
+  else if (view === 'lead-time') renderChart();
 }
 
 for (const [index, tab] of [...document.querySelectorAll('[role="tab"]')].entries()) {
   tab.addEventListener('click', () => {
-    history.replaceState(null, '', index === 1 ? '#throughput' : '#overview');
-    selectView(index === 1);
+    history.replaceState(null, '', viewHash(views[index]));
+    selectView(views[index]);
   });
   tab.addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index;
-    const target = next === 1 ? $('#throughput-tab') : $('#lead-time-tab');
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? views.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + views.length) % views.length;
+    const target = $(`#${views[next]}-tab`);
     target.click();
     target.focus();
   });
 }
-window.addEventListener('hashchange', () => selectView(location.hash === '#throughput'));
-selectView(location.hash === '#throughput');
+window.addEventListener('hashchange', () => selectView(selectedView()));
+selectView(selectedView());
+initializeRoadmap();
 
 function signalDescription(signals) {
   return CONTROL_SIGNALS.filter((signal) => signals.includes(signal.id)).map((signal) => signal.label).join('; ') || 'Brak sygnału';
